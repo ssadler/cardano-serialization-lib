@@ -56,9 +56,10 @@ impl DeserializeEmbeddedGroup for UnitInterval {
 
 impl cbor_event::se::Serialize for Transaction {
     fn serialize<'se, W: Write>(&self, serializer: &'se mut Serializer<W>) -> cbor_event::Result<&'se mut Serializer<W>> {
-        serializer.write_array(cbor_event::Len::Len(3))?;
+        serializer.write_array(cbor_event::Len::Len(4))?;
         self.body.serialize(serializer)?;
         self.witness_set.serialize(serializer)?;
+        serializer.write_special(CBORSpecial::Bool(self.is_valid))?;
         match &self.auxiliary_data {
             Some(x) => {
                 x.serialize(serializer)
@@ -94,6 +95,17 @@ impl DeserializeEmbeddedGroup for Transaction {
         let witness_set = (|| -> Result<_, DeserializeError> {
             Ok(TransactionWitnessSet::deserialize(raw)?)
         })().map_err(|e| e.annotate("witness_set"))?;
+        let is_valid = (|| -> Result<_, DeserializeError> {
+            match raw.cbor_type()? == CBORType::Special {
+                true => {
+                    if let CBORSpecial::Bool(b) = raw.special()? {
+                        return Ok(b);
+                    }
+                    return Err(DeserializeFailure::ExpectedBool.into());
+                },
+                _ => return Err(DeserializeFailure::ExpectedBool.into())
+            }
+        })().map_err(|e| e.annotate("is_valid"))?;
         let auxiliary_data = (|| -> Result<_, DeserializeError> {
             Ok(match raw.cbor_type()? != CBORType::Special {
                 true => {
@@ -110,6 +122,7 @@ impl DeserializeEmbeddedGroup for Transaction {
         Ok(Transaction {
             body,
             witness_set,
+            is_valid,
             auxiliary_data,
         })
     }

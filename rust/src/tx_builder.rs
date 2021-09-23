@@ -89,13 +89,14 @@ fn fake_full_tx(tx_builder: &TransactionBuilder, body: TransactionBody) -> Resul
         native_scripts: script_keys,
         bootstraps: bootstrap_keys,
         // TODO: plutus support?
-        plutus_scripts: tx_builder.plutus_scripts,
-        plutus_data: tx_builder.plutus_data,
-        redeemers: tx_builder.redeemers,
+        plutus_scripts: tx_builder.plutus_scripts.clone(),
+        plutus_data: tx_builder.plutus_data.clone(),
+        redeemers: tx_builder.redeemers.clone(),
     };
     Ok(Transaction {
         body,
         witness_set,
+        is_valid: true,
         auxiliary_data: tx_builder.auxiliary_data.clone(),
     })
 }
@@ -130,6 +131,7 @@ pub struct TransactionBuilder {
     max_tx_size: u32,
     price_mem: f64,
     price_step: f64,
+    language_views: Option<LanguageViews>,
     fee_algo: fees::LinearFee,
     inputs: Vec<TxBuilderInput>,
     outputs: TransactionOutputs,
@@ -337,7 +339,7 @@ impl TransactionBuilder {
         max_tx_size: u32, // protocol parameter
         price_mem: f64, // protocol parameter
         price_step: f64, // protocol parameter
-        language_views: LanguageViews // set of encoded protocol parameters
+        language_views: Option<LanguageViews> // set of encoded protocol parameters
     ) -> Self {
         Self {
             minimum_utxo_val: minimum_utxo_val.clone(),
@@ -580,7 +582,7 @@ impl TransactionBuilder {
             // TODO: update for use with Alonzo
             script_data_hash: match &self.redeemers {
                 None => None,
-                Some(_) => Some(utils::hash_script_data(&self.redeemers.unwrap(), &self.language_views.unwrap(), self.plutus_data)),
+                Some(_) => Some(utils::hash_script_data(&self.redeemers.clone().unwrap(), &self.language_views.clone().unwrap(), self.plutus_data.clone())),
             },
             collateral: self.collateral.clone(),
             required_signers: self.required_signers.clone(),
@@ -659,7 +661,8 @@ mod tests {
             MAX_VALUE_SIZE,
             MAX_TX_SIZE,
             PRICE_MEM,
-            PRICE_STEPS
+            PRICE_STEPS,
+            None
         );
         let spend = root_key_15()
             .derive(harden(1852))
@@ -708,7 +711,7 @@ mod tests {
             tx_builder.get_explicit_input().unwrap().checked_add(&tx_builder.get_implicit_input().unwrap()).unwrap(),
             tx_builder.get_explicit_output().unwrap().checked_add(&Value::new(&tx_builder.get_fee_if_set().unwrap())).unwrap()
         );
-        assert_eq!(tx_builder.full_size().unwrap(), 283);
+        assert_eq!(tx_builder.full_size().unwrap(), 284);
         assert_eq!(tx_builder.output_sizes(), vec![61, 65]);
         let _final_tx = tx_builder.build(); // just test that it doesn't throw
     }
@@ -724,7 +727,8 @@ mod tests {
             MAX_VALUE_SIZE,
             MAX_TX_SIZE,
             PRICE_MEM,
-            PRICE_STEPS
+            PRICE_STEPS,
+            None
         );
         let spend = root_key_15()
             .derive(harden(1852))
@@ -787,7 +791,8 @@ mod tests {
             MAX_VALUE_SIZE,
             MAX_TX_SIZE,
             PRICE_MEM,
-            PRICE_STEPS
+            PRICE_STEPS,
+            None
         );
         let spend = root_key_15()
             .derive(harden(1852))
@@ -832,8 +837,8 @@ mod tests {
         tx_builder.add_change_if_needed(
             &change_addr
         ).unwrap();
-        assert_eq!(tx_builder.min_fee().unwrap().to_str(), "213502");
-        assert_eq!(tx_builder.get_fee_if_set().unwrap().to_str(), "213502");
+        assert_eq!(tx_builder.min_fee().unwrap().to_str(), "214002");
+        assert_eq!(tx_builder.get_fee_if_set().unwrap().to_str(), "214002");
         assert_eq!(tx_builder.get_deposit().unwrap().to_str(), "1000000");
         assert_eq!(tx_builder.outputs.len(), 1);
         assert_eq!(
@@ -858,7 +863,8 @@ mod tests {
             MAX_VALUE_SIZE,
             MAX_TX_SIZE,
             PRICE_MEM,
-            PRICE_STEPS
+            PRICE_STEPS,
+            None
         );
         let spend = root_key_15()
             .derive(harden(1852))
@@ -917,7 +923,8 @@ mod tests {
             MAX_VALUE_SIZE,
             MAX_TX_SIZE,
             PRICE_MEM,
-            PRICE_STEPS
+            PRICE_STEPS,
+            None
         );
         let spend = root_key_15()
             .derive(harden(1852))
@@ -985,7 +992,8 @@ mod tests {
             MAX_VALUE_SIZE,
             MAX_TX_SIZE,
             PRICE_MEM,
-            PRICE_STEPS
+            PRICE_STEPS,
+            None
         );
         let spend = root_key_15()
             .derive(harden(1852))
@@ -1058,7 +1066,8 @@ mod tests {
             MAX_VALUE_SIZE,
             MAX_TX_SIZE,
             PRICE_MEM,
-            PRICE_STEPS
+            PRICE_STEPS,
+            None
         );
         let spend = root_key_15()
             .derive(harden(1852))
@@ -1141,7 +1150,8 @@ mod tests {
             MAX_VALUE_SIZE,
             MAX_TX_SIZE,
             PRICE_MEM,
-            PRICE_STEPS
+            PRICE_STEPS,
+            None
         );
         let spend = root_key_15()
             .derive(harden(1852))
@@ -1259,7 +1269,8 @@ mod tests {
             MAX_VALUE_SIZE,
             MAX_TX_SIZE,
             PRICE_MEM,
-            PRICE_STEPS
+            PRICE_STEPS,
+            None
         );
         let spend = root_key_15()
             .derive(harden(1852))
@@ -1335,7 +1346,8 @@ mod tests {
             MAX_VALUE_SIZE,
             MAX_TX_SIZE,
             PRICE_MEM,
-            PRICE_STEPS
+            PRICE_STEPS,
+            None
         );
 
         let output_addr = ByronAddress::from_base58("Ae2tdPwUPEZD9QQf2ZrcYV34pYJwxK4vqXaF8EXkup1eYH73zUScHReM42b").unwrap();
@@ -1379,7 +1391,8 @@ mod tests {
             MAX_VALUE_SIZE,
             MAX_TX_SIZE,
             PRICE_MEM,
-            PRICE_STEPS
+            PRICE_STEPS,
+            None
         );
 
         let output_addr = ByronAddress::from_base58("Ae2tdPwUPEZD9QQf2ZrcYV34pYJwxK4vqXaF8EXkup1eYH73zUScHReM42b").unwrap();
@@ -1426,7 +1439,8 @@ mod tests {
                 MAX_VALUE_SIZE,
                 MAX_TX_SIZE,
                 PRICE_MEM,
-                PRICE_STEPS
+                PRICE_STEPS,
+                None
             );
 
         let policy_id = &PolicyID::from([0u8; 28]);
@@ -1522,7 +1536,8 @@ mod tests {
             max_value_size,
             MAX_TX_SIZE,
             PRICE_MEM,
-            PRICE_STEPS
+            PRICE_STEPS,
+            None
         );
 
         let (multiasset, policy_ids, names) = create_multiasset();
@@ -1581,7 +1596,8 @@ mod tests {
             10, // super low max output size to test,
             MAX_TX_SIZE,
             PRICE_MEM,
-            PRICE_STEPS
+            PRICE_STEPS,
+            None
         );
 
         tx_builder.add_input(
@@ -1613,7 +1629,8 @@ mod tests {
             max_value_size,
             MAX_TX_SIZE,
             PRICE_MEM,
-            PRICE_STEPS
+            PRICE_STEPS,
+            None
         );
 
         let policy_ids = [
