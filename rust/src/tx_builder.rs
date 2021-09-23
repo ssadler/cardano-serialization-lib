@@ -89,9 +89,9 @@ fn fake_full_tx(tx_builder: &TransactionBuilder, body: TransactionBody) -> Resul
         native_scripts: script_keys,
         bootstraps: bootstrap_keys,
         // TODO: plutus support?
-        plutus_scripts: None,
-        plutus_data: None,
-        redeemers: None,
+        plutus_scripts: tx_builder.plutus_scripts,
+        plutus_data: tx_builder.plutus_data,
+        redeemers: tx_builder.redeemers,
     };
     Ok(Transaction {
         body,
@@ -102,7 +102,7 @@ fn fake_full_tx(tx_builder: &TransactionBuilder, body: TransactionBody) -> Resul
 
 fn min_fee(tx_builder: &TransactionBuilder) -> Result<Coin, JsError> {
     let full_tx = fake_full_tx(tx_builder, tx_builder.build()?)?;
-    fees::min_fee(&full_tx, &tx_builder.fee_algo)
+    fees::min_fee(&full_tx, &tx_builder.fee_algo, tx_builder.price_mem, tx_builder.price_step)
 }
 
 
@@ -128,6 +128,8 @@ pub struct TransactionBuilder {
     key_deposit: BigNum,
     max_value_size: u32,
     max_tx_size: u32,
+    price_mem: f64,
+    price_step: f64,
     fee_algo: fees::LinearFee,
     inputs: Vec<TxBuilderInput>,
     outputs: TransactionOutputs,
@@ -135,6 +137,11 @@ pub struct TransactionBuilder {
     ttl: Option<Slot>, // absolute slot number
     certs: Option<Certificates>,
     withdrawals: Option<Withdrawals>,
+    collateral: Option<TransactionInputs>,
+    required_signers: Option<Ed25519KeyHashes>,
+    plutus_data: Option<PlutusList>,
+    redeemers: Option<Redeemers>,
+    plutus_scripts: Option<PlutusScripts>,
     auxiliary_data: Option<AuxiliaryData>,
     validity_start_interval: Option<Slot>,
     input_types: MockWitnessSet,
@@ -296,6 +303,26 @@ impl TransactionBuilder {
         };
     }
 
+    pub fn set_collateral(&mut self, collateral: &TransactionInputs) {
+        self.collateral = Some(collateral.clone())
+    }
+
+    pub fn plutus_data(&mut self, plutus_data: &PlutusList) {
+        self.plutus_data = Some(plutus_data.clone())
+    }
+    pub fn set_redeemers(&mut self, redeemers: &Redeemers) {
+        self.redeemers = Some(redeemers.clone())
+    }
+    pub fn set_plutus_scripts(&mut self, plutus_scripts: &PlutusScripts) {
+        self.plutus_scripts = Some(plutus_scripts.clone())
+    }
+    pub fn set_required_signers(&mut self, required_signers: &Ed25519KeyHashes) {
+        self.required_signers = Some(required_signers.clone());
+        for required_signer in &required_signers.0 {
+            self.input_types.vkeys.insert(required_signer.clone());
+        };
+    }
+
     pub fn set_auxiliary_data(&mut self, auxiliary_data: &AuxiliaryData) {
         self.auxiliary_data = Some(auxiliary_data.clone())
     }
@@ -308,6 +335,9 @@ impl TransactionBuilder {
         key_deposit: &BigNum,  // protocol parameter
         max_value_size: u32, // protocol parameter
         max_tx_size: u32, // protocol parameter
+        price_mem: f64, // protocol parameter
+        price_step: f64, // protocol parameter
+        language_views: LanguageViews // set of encoded protocol parameters
     ) -> Self {
         Self {
             minimum_utxo_val: minimum_utxo_val.clone(),
@@ -315,6 +345,9 @@ impl TransactionBuilder {
             pool_deposit: pool_deposit.clone(),
             max_value_size,
             max_tx_size,
+            price_mem,
+            price_step,
+            language_views,
             fee_algo: linear_fee.clone(),
             inputs: Vec::new(),
             outputs: TransactionOutputs::new(),
@@ -322,6 +355,11 @@ impl TransactionBuilder {
             ttl: None,
             certs: None,
             withdrawals: None,
+            collateral: None,
+            required_signers: None,
+            plutus_data: None,
+            redeemers: None,
+            plutus_scripts: None,
             auxiliary_data: None,
             input_types: MockWitnessSet {
                 vkeys: BTreeSet::new(),
@@ -540,9 +578,12 @@ impl TransactionBuilder {
             validity_start_interval: self.validity_start_interval,
             mint: self.mint.clone(),
             // TODO: update for use with Alonzo
-            script_data_hash: None,
-            collateral: None,
-            required_signers: None,
+            script_data_hash: match &self.redeemers {
+                None => None,
+                Some(_) => Some(utils::hash_script_data(&self.redeemers.unwrap(), &self.language_views.unwrap(), self.plutus_data)),
+            },
+            collateral: self.collateral.clone(),
+            required_signers: self.required_signers.clone(),
             network_id: None,
         };
         // we must build a tx with fake data (of correct size) to check the final Transaction size
@@ -590,6 +631,9 @@ mod tests {
     const MAX_VALUE_SIZE: u32 = 4000;
     const MAX_TX_SIZE: u32 = 8000; // might be out of date but suffices for our tests
 
+    const PRICE_MEM: f64 = 0.0;
+    const PRICE_STEPS: f64 = 0.0;
+
     fn genesis_id() -> TransactionHash {
         TransactionHash::from([0u8; TransactionHash::BYTE_COUNT])
     }
@@ -613,7 +657,9 @@ mod tests {
             &to_bignum(1),
             &to_bignum(1),
             MAX_VALUE_SIZE,
-            MAX_TX_SIZE
+            MAX_TX_SIZE,
+            PRICE_MEM,
+            PRICE_STEPS
         );
         let spend = root_key_15()
             .derive(harden(1852))
@@ -676,7 +722,9 @@ mod tests {
             &to_bignum(1),
             &to_bignum(1),
             MAX_VALUE_SIZE,
-            MAX_TX_SIZE
+            MAX_TX_SIZE,
+            PRICE_MEM,
+            PRICE_STEPS
         );
         let spend = root_key_15()
             .derive(harden(1852))
@@ -737,7 +785,9 @@ mod tests {
             &to_bignum(1),
             &to_bignum(1_000_000),
             MAX_VALUE_SIZE,
-            MAX_TX_SIZE
+            MAX_TX_SIZE,
+            PRICE_MEM,
+            PRICE_STEPS
         );
         let spend = root_key_15()
             .derive(harden(1852))
@@ -806,7 +856,9 @@ mod tests {
             &to_bignum(0),
             &to_bignum(0),
             MAX_VALUE_SIZE,
-            MAX_TX_SIZE
+            MAX_TX_SIZE,
+            PRICE_MEM,
+            PRICE_STEPS
         );
         let spend = root_key_15()
             .derive(harden(1852))
@@ -863,7 +915,9 @@ mod tests {
             &to_bignum(0),
             &to_bignum(0),
             MAX_VALUE_SIZE,
-            MAX_TX_SIZE
+            MAX_TX_SIZE,
+            PRICE_MEM,
+            PRICE_STEPS
         );
         let spend = root_key_15()
             .derive(harden(1852))
@@ -929,7 +983,9 @@ mod tests {
             &to_bignum(0),
             &to_bignum(5),
             MAX_VALUE_SIZE,
-            MAX_TX_SIZE
+            MAX_TX_SIZE,
+            PRICE_MEM,
+            PRICE_STEPS
         );
         let spend = root_key_15()
             .derive(harden(1852))
@@ -1000,7 +1056,9 @@ mod tests {
             &to_bignum(1),
             &to_bignum(1),
             MAX_VALUE_SIZE,
-            MAX_TX_SIZE
+            MAX_TX_SIZE,
+            PRICE_MEM,
+            PRICE_STEPS
         );
         let spend = root_key_15()
             .derive(harden(1852))
@@ -1081,7 +1139,9 @@ mod tests {
             &to_bignum(0),
             &to_bignum(0),
             MAX_VALUE_SIZE,
-            MAX_TX_SIZE
+            MAX_TX_SIZE,
+            PRICE_MEM,
+            PRICE_STEPS
         );
         let spend = root_key_15()
             .derive(harden(1852))
@@ -1197,7 +1257,9 @@ mod tests {
             &to_bignum(1),
             &to_bignum(1),
             MAX_VALUE_SIZE,
-            MAX_TX_SIZE
+            MAX_TX_SIZE,
+            PRICE_MEM,
+            PRICE_STEPS
         );
         let spend = root_key_15()
             .derive(harden(1852))
@@ -1271,7 +1333,9 @@ mod tests {
             &to_bignum(500000000),
             &to_bignum(2000000),
             MAX_VALUE_SIZE,
-            MAX_TX_SIZE
+            MAX_TX_SIZE,
+            PRICE_MEM,
+            PRICE_STEPS
         );
 
         let output_addr = ByronAddress::from_base58("Ae2tdPwUPEZD9QQf2ZrcYV34pYJwxK4vqXaF8EXkup1eYH73zUScHReM42b").unwrap();
@@ -1313,7 +1377,9 @@ mod tests {
             &to_bignum(500000000),
             &to_bignum(2000000),
             MAX_VALUE_SIZE,
-            MAX_TX_SIZE
+            MAX_TX_SIZE,
+            PRICE_MEM,
+            PRICE_STEPS
         );
 
         let output_addr = ByronAddress::from_base58("Ae2tdPwUPEZD9QQf2ZrcYV34pYJwxK4vqXaF8EXkup1eYH73zUScHReM42b").unwrap();
@@ -1359,6 +1425,8 @@ mod tests {
                 &to_bignum(2000000),
                 MAX_VALUE_SIZE,
                 MAX_TX_SIZE,
+                PRICE_MEM,
+                PRICE_STEPS
             );
 
         let policy_id = &PolicyID::from([0u8; 28]);
@@ -1452,7 +1520,9 @@ mod tests {
             &to_bignum(0),
             &to_bignum(0),
             max_value_size,
-            MAX_TX_SIZE
+            MAX_TX_SIZE,
+            PRICE_MEM,
+            PRICE_STEPS
         );
 
         let (multiasset, policy_ids, names) = create_multiasset();
@@ -1509,7 +1579,9 @@ mod tests {
             &to_bignum(0),
             &to_bignum(0),
             10, // super low max output size to test,
-            MAX_TX_SIZE
+            MAX_TX_SIZE,
+            PRICE_MEM,
+            PRICE_STEPS
         );
 
         tx_builder.add_input(
@@ -1539,7 +1611,9 @@ mod tests {
             &to_bignum(0),
             &to_bignum(0),
             max_value_size,
-            MAX_TX_SIZE
+            MAX_TX_SIZE,
+            PRICE_MEM,
+            PRICE_STEPS
         );
 
         let policy_ids = [
