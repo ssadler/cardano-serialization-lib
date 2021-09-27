@@ -309,7 +309,7 @@ impl TransactionBuilder {
         self.collateral = Some(collateral.clone())
     }
 
-    pub fn plutus_data(&mut self, plutus_data: &PlutusList) {
+    pub fn set_plutus_data(&mut self, plutus_data: &PlutusList) {
         self.plutus_data = Some(plutus_data.clone())
     }
     pub fn set_redeemers(&mut self, redeemers: &Redeemers) {
