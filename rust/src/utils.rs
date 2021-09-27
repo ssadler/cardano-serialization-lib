@@ -960,6 +960,7 @@ fn bundle_size(
 pub fn min_ada_required(
     assets: &Value,
     minimum_utxo_val: &BigNum, // protocol parameter
+    data_hash: bool
 ) -> BigNum {
     // based on https://github.com/input-output-hk/cardano-ledger-specs/blob/master/doc/explanations/min-utxo.rst
     match &assets.multiasset {
@@ -970,6 +971,7 @@ pub fn min_ada_required(
             let tx_out_len_no_val = 14;
             let tx_in_len = 7;
             let utxo_entry_size_without_val: u64 = 6 + tx_out_len_no_val + tx_in_len; // 27
+            let data_hash_size : u64 = 10;
 
             // NOTE: should be 29 but a bug in Haskell set this to 27
             let ada_only_utxo_size: u64 = utxo_entry_size_without_val + coin_size;
@@ -984,7 +986,7 @@ pub fn min_ada_required(
             );
             BigNum(cmp::max(
                 minimum_utxo_val.0,
-                quot(minimum_utxo_val.0, ada_only_utxo_size) * (utxo_entry_size_without_val + (size as u64))
+                quot(minimum_utxo_val.0, ada_only_utxo_size) * (utxo_entry_size_without_val + (size as u64) + if data_hash {data_hash_size} else {0 as u64})
             ))
         }
     }
@@ -1023,8 +1025,8 @@ mod tests {
         };
         
         assert_eq!(
-            min_ada_required(&assets, &BigNum(MINIMUM_UTXO_VAL)).0,
-            MINIMUM_UTXO_VAL
+            min_ada_required(&assets, &BigNum(MINIMUM_UTXO_VAL),false).0,
+            MINIMUM_UTXO_VAL,
         );
     }
 
@@ -1047,7 +1049,7 @@ mod tests {
         };
         
         assert_eq!(
-            min_ada_required(&assets, &BigNum(MINIMUM_UTXO_VAL)).0,
+            min_ada_required(&assets, &BigNum(MINIMUM_UTXO_VAL),false).0,
             1407406
         );
     }
@@ -1071,7 +1073,7 @@ mod tests {
         };
         
         assert_eq!(
-            min_ada_required(&assets, &BigNum(MINIMUM_UTXO_VAL)).0,
+            min_ada_required(&assets, &BigNum(MINIMUM_UTXO_VAL),false).0,
             1444443
         );
     }
@@ -1096,7 +1098,7 @@ mod tests {
         };
         
         assert_eq!(
-            min_ada_required(&assets, &BigNum(MINIMUM_UTXO_VAL)).0,
+            min_ada_required(&assets, &BigNum(MINIMUM_UTXO_VAL),false).0,
             1555554
         );
     }
@@ -1128,7 +1130,7 @@ mod tests {
         };
         
         assert_eq!(
-            min_ada_required(&assets, &BigNum(MINIMUM_UTXO_VAL)).0,
+            min_ada_required(&assets, &BigNum(MINIMUM_UTXO_VAL),false).0,
             1555554
         );
     }
@@ -1163,7 +1165,7 @@ mod tests {
         };
         
         assert_eq!(
-            min_ada_required(&assets, &BigNum(MINIMUM_UTXO_VAL)).0,
+            min_ada_required(&assets, &BigNum(MINIMUM_UTXO_VAL),false).0,
             1962961
         );
     }
@@ -1191,7 +1193,7 @@ mod tests {
         };
         
         assert_eq!(
-            min_ada_required(&assets, &BigNum(MINIMUM_UTXO_VAL)).0,
+            min_ada_required(&assets, &BigNum(MINIMUM_UTXO_VAL),false).0,
             1592591
         );
     }
@@ -1219,7 +1221,7 @@ mod tests {
         };
         
         assert_eq!(
-            min_ada_required(&assets, &BigNum(MINIMUM_UTXO_VAL)).0,
+            min_ada_required(&assets, &BigNum(MINIMUM_UTXO_VAL),false).0,
             1592591
         );
     }
@@ -1251,7 +1253,7 @@ mod tests {
         };
         
         assert_eq!(
-            min_ada_required(&assets, &BigNum(MINIMUM_UTXO_VAL)).0,
+            min_ada_required(&assets, &BigNum(MINIMUM_UTXO_VAL),false).0,
             7592585
         );
     }

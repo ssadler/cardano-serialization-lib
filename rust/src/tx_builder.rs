@@ -250,7 +250,7 @@ impl TransactionBuilder {
                 value_size
             )));
         }
-        let min_ada = min_ada_required(&output.amount(), &self.minimum_utxo_val);
+        let min_ada = min_ada_required(&output.amount(), &self.minimum_utxo_val,output.data_hash() != None);
         if output.amount().coin() < min_ada {
             Err(JsError::from_str(&format!(
                 "Value {} less than the minimum UTXO value {}",
@@ -503,7 +503,7 @@ impl TransactionBuilder {
                         // we only add the minimum needed (for now) to cover this output
                         let mut change_value = Value::new(&Coin::zero());
                         change_value.set_multiasset(&nft_change);
-                        let min_ada = min_ada_required(&change_value, &self.minimum_utxo_val);
+                        let min_ada = min_ada_required(&change_value, &self.minimum_utxo_val,false);
                         change_value.set_coin(&min_ada);
                         let change_output = TransactionOutput::new(address, &change_value);
                         // increase fee
@@ -521,7 +521,7 @@ impl TransactionBuilder {
                     self.outputs.0.last_mut().unwrap().amount = self.outputs.0.last().unwrap().amount.checked_add(&change_left)?;
                     Ok(true)
                 } else {
-                    let min_ada = min_ada_required(&change_estimator, &self.minimum_utxo_val);
+                    let min_ada = min_ada_required(&change_estimator, &self.minimum_utxo_val,false);
                     // no-asset case so we have no problem burning the rest if there is no other option
                     fn burn_extra(builder: &mut TransactionBuilder, burn_amount: &BigNum) -> Result<bool, JsError> {
                         // recall: min_fee assumed the fee was the maximum possible so we definitely have enough input to cover whatever fee it ends up being
