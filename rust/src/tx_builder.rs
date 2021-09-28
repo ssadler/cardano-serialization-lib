@@ -329,6 +329,12 @@ impl TransactionBuilder {
         self.auxiliary_data = Some(auxiliary_data.clone())
     }
 
+    pub fn index_of_input(&self, input: &TransactionInput) -> usize {
+        let mut inputs = self.inputs.iter().map(|TxBuilderInput {input,amount}| input.clone()).collect::<Vec<TransactionInput>>();
+        inputs.sort();
+        inputs.iter().position(|i| i == input).unwrap()
+    }
+
     pub fn new(
         linear_fee: &fees::LinearFee,
         // protocol parameter that defines the minimum value a newly created UTXO can contain
