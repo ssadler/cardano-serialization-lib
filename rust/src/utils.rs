@@ -968,7 +968,7 @@ fn bundle_size(
 #[wasm_bindgen]
 pub fn min_ada_required(
     assets: &Value,
-    coins_per_utxo_word: &BigNum, // protocol parameter
+    minimum_utxo_val: &BigNum, // protocol parameter
     data_hash: Option<DataHash>
 ) -> BigNum {
 // based on https://github.com/input-output-hk/cardano-ledger-specs/blob/master/doc/explanations/min-utxo.rst
@@ -977,6 +977,9 @@ pub fn min_ada_required(
     let tx_out_len_no_val = 14;
     let tx_in_len = 7;
     let utxo_entry_size_without_val: u64 = 6 + tx_out_len_no_val + tx_in_len; // 27
+
+    // NOTE: should be 29 but a bug in Haskell set this to 27
+    let ada_only_utxo_size: u64 = utxo_entry_size_without_val + coin_size;
 
     let mut size = 0;
     if let Some(_) = &assets.multiasset() {
@@ -994,8 +997,10 @@ pub fn min_ada_required(
         data_hash_size = 10; //fixed value in Alonzo
     }
     
-   
-    BigNum(coins_per_utxo_word.0 * (utxo_entry_size_without_val + (size as u64) + data_hash_size))
+    BigNum(cmp::max(
+        minimum_utxo_val.0,
+        quot(minimum_utxo_val.0, ada_only_utxo_size) * (utxo_entry_size_without_val + (size as u64) + data_hash_size)
+    ))
 }
 
 #[cfg(test)]
@@ -1005,7 +1010,7 @@ mod tests {
     use super::*;
 
     // this is what is used in mainnet
-    static MINIMUM_UTXO_VAL: u64 = 34482;
+    static MINIMUM_UTXO_VAL: u64 = 1_000_000;
 
     #[test]
     fn correct_script_data_hash() {
