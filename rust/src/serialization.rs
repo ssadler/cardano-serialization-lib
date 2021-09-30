@@ -112,17 +112,7 @@ impl DeserializeEmbeddedGroup for Transaction {
                 },
                 false => {
                     auxiliary_data = (|| -> Result<_, DeserializeError> {
-                        Ok(match raw.cbor_type()? != CBORType::Special {
-                            true => {
-                                Some(AuxiliaryData::deserialize(raw)?)
-                            },
-                            false => {
-                                if raw.special()? != CBORSpecial::Null {
-                                    return Err(DeserializeFailure::ExpectedNull.into());
-                                }
-                                None
-                            }
-                        })
+                                Ok(Some(AuxiliaryData::deserialize(raw)?))
                     })().map_err(|e| e.annotate("auxiliary_data"))?;
                     has_metadata = true;
                     return Ok(true);
