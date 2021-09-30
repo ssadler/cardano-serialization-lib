@@ -95,7 +95,7 @@ impl DeserializeEmbeddedGroup for Transaction {
         let witness_set = (|| -> Result<_, DeserializeError> {
             Ok(TransactionWitnessSet::deserialize(raw)?)
         })().map_err(|e| e.annotate("witness_set"))?;
-        let mut has_null_metadata = false;
+        let mut has_metadata = false;
         let mut auxiliary_data = None;
         let is_valid = (|| -> Result<_, DeserializeError> {
             match raw.cbor_type()? == CBORType::Special {
@@ -104,18 +104,32 @@ impl DeserializeEmbeddedGroup for Transaction {
                     if let CBORSpecial::Bool(b) = special {
                         return Ok(b);
                     } else if special == CBORSpecial::Null {
-                        has_null_metadata = true;
+                        has_metadata = true;
                         return Ok(true);
                     } else {
                         return Err(DeserializeFailure::ExpectedBool.into());
                     }
                 },
                 false => {
+                    auxiliary_data = (|| -> Result<_, DeserializeError> {
+                        Ok(match raw.cbor_type()? != CBORType::Special {
+                            true => {
+                                Some(AuxiliaryData::deserialize(raw)?)
+                            },
+                            false => {
+                                if raw.special()? != CBORSpecial::Null {
+                                    return Err(DeserializeFailure::ExpectedNull.into());
+                                }
+                                None
+                            }
+                        })
+                    })().map_err(|e| e.annotate("auxiliary_data"))?;
+                    has_metadata = true;
                     return Ok(true);
                 }
             }
         })().map_err(|e| e.annotate("is_valid"))?;
-        if (!has_null_metadata) {
+        if (!has_metadata) {
             auxiliary_data = (|| -> Result<_, DeserializeError> {
                 Ok(match raw.cbor_type()? != CBORType::Special {
                     true => {
