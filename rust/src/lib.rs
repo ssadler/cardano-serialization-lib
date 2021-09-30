@@ -117,6 +117,10 @@ impl Transaction {
         self.is_valid.clone()
     }
 
+    pub fn set_is_valid(&mut self, valid: bool) {
+        self.is_valid = valid
+    }
+
     pub fn auxiliary_data(&self) -> Option<AuxiliaryData> {
         self.auxiliary_data.clone()
     }
@@ -124,13 +128,12 @@ impl Transaction {
     pub fn new(
         body: &TransactionBody,
         witness_set: &TransactionWitnessSet,
-        is_valid: bool,
         auxiliary_data: Option<AuxiliaryData>,
     ) -> Self {
         Self {
             body: body.clone(),
             witness_set: witness_set.clone(),
-            is_valid: is_valid.clone(),
+            is_valid: true,
             auxiliary_data: auxiliary_data.clone(),
         }
     }

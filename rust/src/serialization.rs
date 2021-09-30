@@ -95,30 +95,41 @@ impl DeserializeEmbeddedGroup for Transaction {
         let witness_set = (|| -> Result<_, DeserializeError> {
             Ok(TransactionWitnessSet::deserialize(raw)?)
         })().map_err(|e| e.annotate("witness_set"))?;
+        let mut has_null_metadata = false;
+        let mut auxiliary_data = None;
         let is_valid = (|| -> Result<_, DeserializeError> {
             match raw.cbor_type()? == CBORType::Special {
                 true => {
-                    if let CBORSpecial::Bool(b) = raw.special()? {
+                    let special = raw.special()?;
+                    if let CBORSpecial::Bool(b) = special {
                         return Ok(b);
+                    } else if special == CBORSpecial::Null {
+                        has_null_metadata = true;
+                        return Ok(true);
+                    } else {
+                        return Err(DeserializeFailure::ExpectedBool.into());
                     }
-                    return Err(DeserializeFailure::ExpectedBool.into());
-                },
-                _ => return Err(DeserializeFailure::ExpectedBool.into())
-            }
-        })().map_err(|e| e.annotate("is_valid"))?;
-        let auxiliary_data = (|| -> Result<_, DeserializeError> {
-            Ok(match raw.cbor_type()? != CBORType::Special {
-                true => {
-                    Some(AuxiliaryData::deserialize(raw)?)
                 },
                 false => {
-                    if raw.special()? != CBORSpecial::Null {
-                        return Err(DeserializeFailure::ExpectedNull.into());
-                    }
-                    None
+                    return Ok(true);
                 }
-            })
-        })().map_err(|e| e.annotate("auxiliary_data"))?;
+            }
+        })().map_err(|e| e.annotate("is_valid"))?;
+        if (!has_null_metadata) {
+            auxiliary_data = (|| -> Result<_, DeserializeError> {
+                Ok(match raw.cbor_type()? != CBORType::Special {
+                    true => {
+                        Some(AuxiliaryData::deserialize(raw)?)
+                    },
+                    false => {
+                        if raw.special()? != CBORSpecial::Null {
+                            return Err(DeserializeFailure::ExpectedNull.into());
+                        }
+                        None
+                    }
+                })
+            })().map_err(|e| e.annotate("auxiliary_data"))?;
+        }
         Ok(Transaction {
             body,
             witness_set,

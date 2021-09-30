@@ -82,7 +82,6 @@ mod tests {
         let signed_tx = Transaction::new(
             &body,
             &w,
-            true,
             None,
         );
 
@@ -129,7 +128,6 @@ mod tests {
         let signed_tx = Transaction::new(
             &body,
             &w,
-            true,
             None,
         );
 
@@ -200,7 +198,6 @@ mod tests {
         let signed_tx = Transaction::new(
             &body,
             &w,
-            true,
             None,
         );
 
@@ -297,7 +294,6 @@ mod tests {
         let signed_tx = Transaction::new(
             &body,
             &w,
-            true,
             None,
         );
 
@@ -492,7 +488,6 @@ mod tests {
         let signed_tx = Transaction::new(
             &body,
             &w,
-            true,
             None,
         );
 
