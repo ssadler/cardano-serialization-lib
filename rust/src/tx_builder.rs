@@ -310,8 +310,56 @@ impl TransactionBuilder {
         };
     }
 
+    pub fn add_address_witness(&mut self, address: &Address) {
+        match &BaseAddress::from_address(address) {
+            Some(addr) => {
+                match &addr.payment_cred().to_keyhash() {
+                    Some(hash) => {self.input_types.vkeys.insert(hash.clone());},
+                    None => ()
+                };
+                match &addr.payment_cred().to_scripthash() {
+                    Some(hash) => {self.input_types.scripts.insert(hash.clone());},
+                    None => ()
+                };
+            },
+            None => ()
+        };
+        match &EnterpriseAddress::from_address(address) {
+            Some(addr) => {
+                match &addr.payment_cred().to_keyhash() {
+                    Some(hash) => {self.input_types.vkeys.insert(hash.clone());},
+                    None => ()
+                };
+                match &addr.payment_cred().to_scripthash() {
+                    Some(hash) => {self.input_types.scripts.insert(hash.clone());},
+                    None => ()
+                };
+            },
+            None => ()
+        };
+        match &PointerAddress::from_address(address) {
+            Some(addr) => {
+                match &addr.payment_cred().to_keyhash() {
+                    Some(hash) => {self.input_types.vkeys.insert(hash.clone());},
+                    None => ()
+                };
+                match &addr.payment_cred().to_scripthash() {
+                    Some(hash) => {self.input_types.scripts.insert(hash.clone());},
+                    None => ()
+                };
+            },
+            None => ()
+        };
+        match &ByronAddress::from_address(address) {
+            Some(addr) => {
+                self.input_types.bootstraps.insert(addr.to_bytes());
+            },
+            None => ()
+        };
+    }
+
     pub fn set_collateral(&mut self, collateral: &TransactionInputs) {
-        self.collateral = Some(collateral.clone())
+        self.collateral = Some(collateral.clone());
     }
 
     pub fn set_plutus_data(&mut self, plutus_data: &PlutusList) {
